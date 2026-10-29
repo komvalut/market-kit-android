@@ -17,6 +17,12 @@ interface CoinDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(tokenEntity: TokenEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertIfAbsent(coin: Coin)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertIfAbsent(blockchainEntity: BlockchainEntity)
+
     @Query("SELECT * FROM Coin WHERE uid = :uid LIMIT 1")
     fun getCoin(uid: String): Coin?
 

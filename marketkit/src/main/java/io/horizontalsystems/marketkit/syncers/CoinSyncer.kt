@@ -99,7 +99,7 @@ class CoinSyncer(
         val seeds = LocalCoinCatalog.seed()
         val mergedCoins = (coins + seeds.coins).distinctBy { it.uid }
         val mergedBlockchains = (blockchainEntities + seeds.blockchains).distinctBy { it.uid }
-        val mergedTokens = (transform(tokenEntities) + seeds.tokens)
+        val mergedTokens = (seeds.tokens + transform(tokenEntities))
             .distinctBy { it.coinUid to (it.blockchainUid to (it.type to it.reference)) }
 
         storage.update(mergedCoins, mergedBlockchains, mergedTokens.toList())
@@ -113,7 +113,9 @@ class CoinSyncer(
     fun seedLocal() {
         scope.launch {
             try {
-                handleFetched(emptyList(), emptyList(), emptyList())
+                val seeds = LocalCoinCatalog.seed()
+                storage.seedLocal(seeds.coins, seeds.blockchains, seeds.tokens)
+                _fullCoinsUpdatedObservable.tryEmit(Unit)
             } catch (e: Throwable) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e("CoinSyncer", "seedLocal() error", e)

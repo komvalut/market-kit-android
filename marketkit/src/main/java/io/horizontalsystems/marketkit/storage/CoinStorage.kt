@@ -180,4 +180,12 @@ class CoinStorage(val marketDatabase: MarketDatabase) {
         }
     }
 
+    fun seedLocal(coins: List<Coin>, blockchainEntities: List<BlockchainEntity>, tokenEntities: List<TokenEntity>) {
+        marketDatabase.runInTransaction {
+            blockchainEntities.forEach { coinDao.insertIfAbsent(it) }
+            coins.forEach { coinDao.insertIfAbsent(it) }
+            tokenEntities.forEach { coinDao.insert(it) }
+        }
+    }
+
 }

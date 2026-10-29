@@ -58,14 +58,16 @@ abstract class MarketDatabase : RoomDatabase() {
             val db = Room.databaseBuilder(context, MarketDatabase::class.java, "marketKitDatabase")
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
-                        val loadedCount = loadInitialCoins(db, context)
-                        logger.info("onCreate Loaded coins count: $loadedCount")
+                        ensureInitialCoins(db, context)
                     }
 
                     override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
                         super.onDestructiveMigration(db)
-                        val loadedCount = loadInitialCoins(db, context)
-                        logger.info("onDestructiveMigration Loaded coins count: $loadedCount")
+                        ensureInitialCoins(db, context)
+                    }
+
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        ensureInitialCoins(db, context)
                     }
                 })
 //                .setQueryCallback({ sqlQuery, bindArgs ->
@@ -81,22 +83,52 @@ abstract class MarketDatabase : RoomDatabase() {
             return db
         }
 
-        private fun loadInitialCoins(db: SupportSQLiteDatabase, context: Context): Int {
-            val inputStream = context.assets.open("initial_coins_list")
-            val bufferedReader = BufferedReader(InputStreamReader(inputStream))
-            var insertCount = 0
+        private const val INITIAL_COINS_ASSET_VERSION_KEY = "marketkit-initial-coins-asset-version"
+        private const val INITIAL_COINS_ASSET_VERSION = "1"
 
-            try {
-                while (bufferedReader.ready()) {
-                    val insertStmt: String = bufferedReader.readLine()
-                    db.execSQL(insertStmt)
-                    insertCount++
-                }
-            } catch (error: Exception) {
-                logger.severe("Error in loadInitialCoins(): ${error.message ?: error.javaClass.simpleName}")
+        private fun ensureInitialCoins(db: SupportSQLiteDatabase, context: Context) {
+            val versionCursor = db.query(
+                "SELECT `value` FROM `SyncerState` WHERE `key` = ?",
+                arrayOf(INITIAL_COINS_ASSET_VERSION_KEY),
+            )
+            val loadedVersion = versionCursor.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
             }
+            if (loadedVersion == INITIAL_COINS_ASSET_VERSION) return
 
-            return insertCount
+            val ownsTransaction = !db.inTransaction()
+            if (ownsTransaction) db.beginTransaction()
+            try {
+                val loadedCount = loadInitialCoins(db, context)
+                db.execSQL(
+                    "INSERT OR REPLACE INTO `SyncerState` (`key`, `value`) VALUES (?, ?)",
+                    arrayOf(INITIAL_COINS_ASSET_VERSION_KEY, INITIAL_COINS_ASSET_VERSION),
+                )
+                if (ownsTransaction) db.setTransactionSuccessful()
+                logger.info("Loaded initial coin catalog statements: $loadedCount")
+            } catch (error: Exception) {
+                logger.severe("Error in ensureInitialCoins(): ${error.message ?: error.javaClass.simpleName}")
+            } finally {
+                if (ownsTransaction) db.endTransaction()
+            }
+        }
+
+        private fun loadInitialCoins(db: SupportSQLiteDatabase, context: Context): Int {
+            val statements = context.assets.open("initial_coins_list").use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { it.readLines() }
+            }
+            val createStatements = statements.filter { it.startsWith("CREATE TABLE") }
+            val blockchainStatements = statements.filter { it.startsWith("INSERT INTO BlockchainEntity") }
+            val coinStatements = statements.filter { it.startsWith("INSERT INTO Coin VALUES") }
+            val tokenStatements = statements.filter { it.startsWith("INSERT INTO TokenEntity") }
+            val orderedStatements = createStatements + blockchainStatements + coinStatements + tokenStatements
+            check(orderedStatements.size == statements.size) { "Unexpected statement in initial coin catalog" }
+
+            orderedStatements.forEach { statement ->
+                val safeStatement = statement.replaceFirst("INSERT INTO ", "INSERT OR IGNORE INTO ")
+                db.execSQL(safeStatement)
+            }
+            return orderedStatements.size
         }
     }
 }
