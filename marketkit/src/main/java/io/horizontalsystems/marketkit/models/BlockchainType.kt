@@ -25,6 +25,9 @@ sealed class BlockchainType : Parcelable {
     object Zcash : BlockchainType()
 
     @Parcelize @Serializable
+    object PirateChain : BlockchainType()
+
+    @Parcelize @Serializable
     object Ethereum : BlockchainType()
 
     @Parcelize @Serializable
@@ -101,6 +104,7 @@ sealed class BlockchainType : Parcelable {
             is Litecoin -> "litecoin"
             is Dash -> "dash"
             is Zcash -> "zcash"
+            is PirateChain -> "pirate-chain"
             is Ethereum -> "ethereum"
             is BinanceSmartChain -> "binance-smart-chain"
             is Polygon -> "polygon-pos"
@@ -141,6 +145,7 @@ sealed class BlockchainType : Parcelable {
         Litecoin -> "litecoin"
         Dash -> "dash"
         Zcash -> "zcash"
+        PirateChain -> "pirateChain"
         Ethereum -> "ethereum"
         BinanceSmartChain -> "binanceSmartChain"
         Polygon -> "polygon"
@@ -176,6 +181,7 @@ sealed class BlockchainType : Parcelable {
                 "litecoin" -> Litecoin
                 "dash" -> Dash
                 "zcash" -> Zcash
+                "pirate-chain" -> PirateChain
                 "ethereum" -> Ethereum
                 "binance-smart-chain" -> BinanceSmartChain
                 "polygon-pos" -> Polygon

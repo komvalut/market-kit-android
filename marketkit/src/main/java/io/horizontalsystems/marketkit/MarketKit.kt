@@ -644,6 +644,7 @@ class MarketKit(
             val coinManager = CoinManager(coinStorage)
             val marketOverviewManager = MarketOverviewManager(hsProvider)
             val coinSyncer = CoinSyncer(hsProvider, coinStorage, marketDatabase.syncerStateDao())
+            coinSyncer.seedLocal()
             val coinPriceManager = CoinPriceManager(CoinPriceStorage(marketDatabase))
             val coinHistoricalPriceManager = CoinHistoricalPriceManager(
                 CoinHistoricalPriceStorage(marketDatabase),

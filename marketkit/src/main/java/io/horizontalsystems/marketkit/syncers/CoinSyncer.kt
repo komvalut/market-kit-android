@@ -96,8 +96,29 @@ class CoinSyncer(
     }
 
     private fun handleFetched(coins: List<Coin>, blockchainEntities: List<BlockchainEntity>, tokenEntities: List<TokenEntity>) {
-        storage.update(coins, blockchainEntities, transform(tokenEntities))
+        val seeds = LocalCoinCatalog.seed()
+        val mergedCoins = (coins + seeds.coins).distinctBy { it.uid }
+        val mergedBlockchains = (blockchainEntities + seeds.blockchains).distinctBy { it.uid }
+        val mergedTokens = (transform(tokenEntities) + seeds.tokens)
+            .distinctBy { it.coinUid to (it.blockchainUid to (it.type to it.reference)) }
+
+        storage.update(mergedCoins, mergedBlockchains, mergedTokens.toList())
         _fullCoinsUpdatedObservable.tryEmit(Unit)
+    }
+
+    /**
+     * Seeds [LocalCoinCatalog] into storage without waiting for the remote backend.
+     * Runs on the syncer's IO scope so it never blocks the caller.
+     */
+    fun seedLocal() {
+        scope.launch {
+            try {
+                handleFetched(emptyList(), emptyList(), emptyList())
+            } catch (e: Throwable) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e("CoinSyncer", "seedLocal() error", e)
+            }
+        }
     }
 
     private fun transform(tokenEntities: List<TokenEntity>): List<TokenEntity> {
